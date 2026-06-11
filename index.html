@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>07-02 장소감 탐구</title>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* ══ 파스텔 팔레트 ══ */
+:root {
+  --bg:       #F7F5FF;       /* 연라벤더 배경 */
+  --surface:  #FFFFFF;
+  --header:   #EDE9FE;       /* 연보라 헤더 */
+  --nav-bg:   #F3F0FF;
+  --t1:       #8B6FD4;       /* 파스텔 보라 */
+  --t1-l:     #EDE9FE;
+  --t2:       #D4849A;       /* 파스텔 핑크 */
+  --t2-l:     #FCE7F3;
+  --t3:       #6BAE97;       /* 파스텔 민트 */
+  --t3-l:     #D1FAE5;
+  --amber:    #D4A76A;       /* 파스텔 살구 */
+  --amber-l:  #FEF3C7;
+  --blue:     #7BA7D4;       /* 파스텔 블루 */
+  --blue-l:   #DBEAFE;
+  --ink:      #2D2A3E;
+  --gray:     #7C7A8E;
+  --gray-l:   #F5F4F8;
+  --border:   #E4E1F0;
+  --shadow:   rgba(100,80,180,.08);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:'Nanum Gothic',sans-serif;
+  background:var(--bg); color:var(--ink); min-height:100vh;
+}
+
+/* ── 모달 ── */
+.setup-overlay {
+  position:fixed; inset:0;
+  background:rgba(60,50,100,.45);
+  display:flex; align-items:center; justify-content:center;
+  z-index:9999; backdrop-filter:blur(8px);
+}
+.setup-box {
+  background:white; border:2px solid #C4B5FD;
+  border-radius:16px; padding:36px 40px;
+  max-width:440px; width:90%;
+  box-shadow:0 16px 48px rgba(100,80,180,.18);
+}
+.setup-icon { font-size:42px; text-align:center; margin-bottom:10px; }
+.setup-title {
+  font-family:'Nanum Myeongjo',serif;
+  font-size:21px; font-weight:800; color:var(--ink);
+  text-align:center; margin-bottom:5px;
+}
+.setup-sub {
+  font-size:11.5px; color:var(--gray);
+  text-align:center; margin-bottom:22px; line-height:1.6;
+}
+.setup-label { font-size:11px; font-weight:700; color:var(--t1); margin-bottom:6px; }
+.setup-input {
+  width:100%; padding:10px 14px;
+  background:var(--t1-l); border:1.5px solid #C4B5FD;
+  border-radius:8px; font-size:15px; font-weight:800;
+  font-family:'Nanum Gothic',sans-serif; color:var(--ink);
+  outline:none; margin-bottom:8px;
+}
+.setup-input:focus { border-color:var(--t1); }
+.setup-input::placeholder { color:#BDB5D8; font-weight:400; }
+.setup-hint {
+  font-size:10px; color:var(--gray);
+  margin-bottom:20px; line-height:1.6;
+  background:var(--gray-l); border-radius:6px; padding:8px 12px;
+}
+.setup-hint strong { color:var(--t1); }
+.setup-btn {
+  width:100%; padding:12px;
+  background:var(--t1); color:white;
+  border:none; border-radius:8px;
+  font-size:14px; font-weight:800;
+  font-family:'Nanum Gothic',sans-serif; cursor:pointer;
+  transition:background .15s;
+}
+.setup-btn:hover { background:#7C5FC8; }
+
+/* ── 헤더 ── */
+.site-header {
+  background:white;
+  border-bottom:2px solid var(--border);
+  padding:0 24px; display:flex; align-items:center;
+  position:sticky; top:0; z-index:200; height:52px; gap:12px;
+  box-shadow:0 2px 12px var(--shadow);
+}
+.site-logo {
+  font-family:'Nanum Myeongjo',serif;
+  font-size:15px; font-weight:800; color:var(--ink); white-space:nowrap;
+}
+.site-school {
+  font-size:11px; font-weight:800; padding:3px 12px;
+  border-radius:20px; background:var(--t1); color:white;
+  white-space:nowrap; cursor:pointer; transition:background .15s;
+}
+.site-school:hover { background:#7C5FC8; }
+.site-badge {
+  font-size:9px; font-weight:800; padding:2px 8px; border-radius:3px;
+  background:var(--t1-l); color:var(--t1);
+}
+.hbtn {
+  font-family:'Nanum Gothic',sans-serif; font-size:11px; font-weight:800;
+  padding:5px 14px; border-radius:6px; border:none; cursor:pointer; white-space:nowrap;
+}
+
+/* ── 탭 네비 ── */
+.tab-nav {
+  background:white;
+  border-bottom:2px solid var(--border);
+  padding:0 24px; display:flex;
+  position:sticky; top:52px; z-index:190; overflow-x:auto;
+  box-shadow:0 2px 8px var(--shadow);
+}
+.tab-btn {
+  font-family:'Nanum Gothic',sans-serif; font-size:12px; font-weight:700;
+  padding:14px 22px; border:none; background:none; cursor:pointer;
+  color:#A09AB8; white-space:nowrap;
+  border-bottom:3px solid transparent; margin-bottom:-2px;
+  display:flex; align-items:center; gap:7px; transition:all .2s;
+}
+.tab-btn:hover { color:var(--ink); }
+.tab-btn.active { color:var(--ink); }
+.tab-step {
+  width:20px; height:20px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:800; flex-shrink:0;
+  background:var(--border); color:var(--gray);
+  transition:all .2s;
+}
+.tab-btn.active .tab-step { color:white; }
+
+/* ── 패널 ── */
+.tab-panel { display:none; min-height:calc(100vh - 104px); }
+.tab-panel.active { display:block; }
+
+/* ══ 공통 컴포넌트 ══ */
+.wrap { max-width:860px; margin:0 auto; padding:24px; }
+.card {
+  background:white; border-radius:12px;
+  border:1.5px solid var(--border); overflow:hidden; margin-bottom:16px;
+  box-shadow:0 2px 12px var(--shadow);
+}
+.card-hdr {
+  padding:11px 16px; display:flex; align-items:center; gap:8px;
+  font-size:12px; font-weight:800;
+}
+.card-body { padding:14px 16px; }
+.write-box {
+  width:100%; min-height:44px;
+  font-family:'Nanum Gothic',sans-serif; font-size:11px;
+  color:var(--ink); line-height:1.6;
+  border:1.5px solid var(--border); border-radius:6px;
+  padding:6px 9px; outline:none; background:white; resize:vertical;
+  transition:border-color .2s;
+}
+.write-box:focus { border-color:var(--t1); }
+.write-box:empty::before {
+  content:attr(data-placeholder);
+  color:#C4BFD8; pointer-events:none; font-style:italic; font-size:10px;
+}
+.field-label { font-size:10px; font-weight:700; margin-bottom:4px; }
+.next-btn {
+  display:block; margin:16px auto 0; padding:11px 36px;
+  font-family:'Nanum Gothic',sans-serif; font-size:13px; font-weight:800;
+  border:none; border-radius:8px; cursor:pointer; color:white;
+  transition:opacity .15s;
+}
+.next-btn:hover { opacity:.85; }
+
+/* ══ 탭1 ══ */
+.t1-intro {
+  background:linear-gradient(135deg,var(--t1-l),var(--blue-l));
+  border:1.5px solid #C4B5FD;
+  border-radius:12px; padding:20px 24px; margin-bottom:16px;
+  box-shadow:0 2px 12px var(--shadow);
+}
+.t1-intro-title {
+  font-family:'Nanum Myeongjo',serif;
+  font-size:19px; font-weight:800; color:var(--ink); margin-bottom:5px;
+}
+.t1-intro-sub { font-size:12px; color:var(--gray); line-height:1.6; }
+.t1-example {
+  background:white; border:1px solid #C4B5FD;
+  border-radius:6px; padding:8px 14px; margin-top:10px;
+  font-size:11.5px; color:var(--t1); line-height:1.6;
+}
+
+/* 척도 표 */
+.scale-table { width:100%; border-collapse:collapse; font-size:11.5px; }
+.scale-table thead tr { background:var(--t1); }
+.scale-table thead th { padding:9px 6px; color:white; font-weight:800; text-align:center; }
+.scale-table thead th:first-child { text-align:left; padding-left:14px; width:44%; }
+.scale-table thead th.topic-col { width:10%; font-size:10px; }
+.scale-table tbody tr:nth-child(even) { background:var(--t1-l); }
+.scale-table tbody tr:hover { background:#E5DEFF; }
+.scale-table td { padding:9px 6px; border-bottom:1pt solid var(--border); vertical-align:middle; }
+.scale-table td:first-child { padding-left:14px; }
+.topic-pill {
+  display:inline-block; font-size:9px; font-weight:800;
+  padding:2px 7px; border-radius:10px; white-space:nowrap;
+  background:var(--t1); color:white;
+}
+.scale-radio { text-align:center; }
+.scale-radio input[type=radio] {
+  width:16px; height:16px; cursor:pointer;
+  accent-color:var(--t1); display:inline-block;
+}
+.free-input {
+  border:none; border-bottom:1.5px solid var(--border);
+  background:transparent; font-size:11.5px;
+  font-family:'Nanum Gothic',sans-serif; color:var(--ink);
+  padding:1px 4px; outline:none; width:130px;
+}
+.free-input:focus { border-bottom-color:var(--t1); }
+.free-input::placeholder { color:#C4BFD8; font-style:italic; font-size:10px; }
+
+.result-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+.result-card {
+  border:1.5px solid var(--border); border-radius:8px;
+  padding:10px 14px; background:var(--gray-l);
+}
+.result-label { font-size:10px; font-weight:700; color:var(--gray); margin-bottom:5px; }
+
+/* ══ 탭2 ══ */
+.routine-intro {
+  background:linear-gradient(135deg,var(--t2-l),var(--amber-l));
+  border:1.5px solid #F9A8D4;
+  border-radius:12px; padding:18px 24px; margin-bottom:14px;
+  box-shadow:0 2px 12px var(--shadow);
+}
+.routine-intro-title {
+  font-family:'Nanum Myeongjo',serif;
+  font-size:19px; font-weight:800; color:var(--ink); margin-bottom:5px;
+}
+.routine-steps { display:flex; gap:8px; margin-top:10px; }
+.routine-step {
+  flex:1; border-radius:8px; border:1.5px solid;
+  padding:8px 10px; font-size:10.5px; line-height:1.5;
+  background:white;
+}
+.routine-step .rs-num { font-weight:800; font-size:11px; display:block; margin-bottom:3px; }
+
+/* 루틴 카드 */
+.r-card { border-radius:12px; border:2px solid; overflow:hidden; margin-bottom:12px; box-shadow:0 2px 10px var(--shadow); }
+.r-card-hdr {
+  padding:10px 16px; display:flex; align-items:center; gap:9px;
+}
+.r-card-num {
+  width:26px; height:26px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:800; flex-shrink:0;
+  background:rgba(255,255,255,.35);
+}
+.r-card-title { font-family:'Nanum Myeongjo',serif; font-size:14px; font-weight:800; }
+.r-card-sub { font-size:9.5px; margin-top:1px; }
+.r-card-body { padding:12px 16px; }
+.prompt-item { display:flex; gap:7px; align-items:flex-start; margin-bottom:8px; }
+.prompt-q { font-size:10.5px; font-weight:800; flex-shrink:0; padding-top:2px; }
+.prompt-a {
+  flex:1; font-family:'Nanum Gothic',sans-serif; font-size:11px;
+  color:var(--ink); border:none; border-bottom:1.5px solid;
+  padding:2px 5px; outline:none; background:transparent; min-height:20px; line-height:1.5;
+}
+.prompt-a:focus { background:rgba(255,255,255,.6); border-radius:3px; }
+.prompt-a:empty::before {
+  content:attr(data-placeholder);
+  color:#C4BFD8; pointer-events:none; font-style:italic; font-size:10px;
+}
+.emotion-row { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:4px; }
+.e-label { font-size:10px; font-weight:700; color:var(--gray); }
+.e-btn { font-size:17px; cursor:pointer; border:2px solid transparent; border-radius:4px; background:none; padding:1px; transition:transform .15s; }
+.e-btn:hover { transform:scale(1.2); }
+.e-btn.sel { border-color:var(--t2); background:var(--t2-l); }
+.big-write {
+  width:100%; min-height:52px;
+  font-family:'Nanum Gothic',sans-serif; font-size:11px;
+  color:var(--ink); line-height:1.7;
+  border:1.5px solid var(--border); border-radius:6px;
+  padding:6px 9px; outline:none; background:white; resize:vertical;
+}
+.big-write:focus { border-color:var(--t2); }
+.big-write:empty::before {
+  content:attr(data-placeholder);
+  color:#C4BFD8; pointer-events:none; font-style:italic; font-size:10px;
+}
+
+/* 지도 */
+.map-section {
+  background:white; border-radius:12px;
+  border:2px solid #A7D8C8; overflow:hidden; margin-bottom:12px;
+  box-shadow:0 2px 10px var(--shadow);
+}
+.map-hdr {
+  background:var(--t3); padding:10px 16px;
+  display:flex; align-items:center; gap:8px;
+  font-size:12px; font-weight:800; color:white;
+}
+.map-body { display:grid; grid-template-columns:1fr 240px; }
+#placeMap { height:260px; }
+.map-ctrl {
+  padding:12px; border-left:1.5px solid var(--border);
+  display:flex; flex-direction:column; gap:8px; background:var(--gray-l);
+}
+.map-ctrl-label { font-size:10px; font-weight:700; color:var(--t3); }
+.map-ctrl-hint { font-size:10px; color:var(--gray); line-height:1.5; }
+.map-add-btn {
+  font-family:'Nanum Gothic',sans-serif;
+  background:var(--t3); color:white; border:none;
+  border-radius:6px; padding:8px; font-size:11px; font-weight:800;
+  cursor:pointer; text-align:center;
+}
+.map-add-btn:hover { background:#5A9B84; }
+.map-add-btn.active { background:#E75480; animation:pulse .8s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.7} }
+.marker-list { display:flex; flex-direction:column; gap:5px; flex:1; overflow-y:auto; }
+.marker-item {
+  background:white; border:1px solid var(--border); border-radius:5px;
+  padding:5px 8px; font-size:10px; display:flex; gap:5px; align-items:flex-start;
+}
+.marker-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; margin-top:2px; }
+.marker-del { margin-left:auto; background:none; border:none; color:#C4BFD8; cursor:pointer; font-size:13px; }
+.marker-del:hover { color:#E75480; }
+
+/* ══ 탭3 ══ */
+.share-grid { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; }
+.share-col { border-right:1px solid var(--border); padding:10px 12px; }
+.share-col:last-child { border-right:none; }
+.share-col-hdr {
+  border-radius:6px; padding:6px 9px; margin-bottom:8px;
+  display:flex; align-items:center; gap:5px;
+  font-size:10px; font-weight:800; color:white;
+}
+.share-col-num {
+  width:20px; height:20px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:800; color:white;
+  background:rgba(255,255,255,.3); flex-shrink:0;
+}
+.share-name-input {
+  border:none; border-bottom:1px solid rgba(255,255,255,.4);
+  background:transparent; font-size:10px; font-weight:700;
+  font-family:'Nanum Gothic',sans-serif; color:white;
+  outline:none; flex:1; min-width:0;
+}
+.share-field { margin-bottom:6px; }
+.share-label { font-size:9px; font-weight:700; margin-bottom:2px; }
+.share-write {
+  width:100%; min-height:32px;
+  font-family:'Nanum Gothic',sans-serif; font-size:10px;
+  color:var(--ink); line-height:1.5;
+  border:1px solid var(--border); border-radius:4px;
+  padding:3px 6px; outline:none; background:white; resize:none;
+}
+.share-write:empty::before {
+  content:attr(data-placeholder);
+  color:#C4BFD8; pointer-events:none; font-style:italic; font-size:9px;
+}
+.discovery-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.reflect-box {
+  background:linear-gradient(135deg,var(--t3-l),var(--blue-l));
+  border:1.5px solid #A7D8C8; border-radius:10px; padding:14px 16px;
+  margin-bottom:14px;
+}
+.sel-bar {
+  background:var(--t1-l); border-top:1px solid #C4B5FD;
+  padding:8px 16px; display:flex; gap:16px; flex-wrap:wrap;
+  font-size:9.5px; color:var(--t1);
+}
+.sel-bar strong { font-weight:800; }
+</style>
+</head>
+<body>
+
+<!-- 모달 -->
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-box">
+    <div class="setup-icon">🏫</div>
+    <div class="setup-title">우리 학교 장소감 탐구</div>
+    <div class="setup-sub">학교 이름을 입력하면 활동지 전체에 자동으로 반영됩니다.</div>
+    <div class="setup-label">우리 학교 이름</div>
+    <input class="setup-input" id="schoolInput" type="text" placeholder="예: 00중학교" maxlength="20"
+      onkeydown="if(event.key==='Enter') startActivity()">
+    <div class="setup-hint">
+      <strong>활동 1</strong> — 우리 학교 장소감 측정 (4점 척도)<br>
+      <strong>활동 2</strong> — 내가 선택한 장소의 중심·주변·숨겨진 이야기 + 지도 핀 찍기<br>
+      <strong>활동 3</strong> — 모둠 공유 + 장소감 성찰
+    </div>
+    <button class="setup-btn" onclick="startActivity()">✅ 시작하기</button>
+  </div>
+</div>
+
+<!-- 헤더 -->
+<div class="site-header">
+  <div class="site-logo">🗺️ 장소감 탐구</div>
+  <div class="site-school" id="schoolTag" onclick="changeSchool()">학교 미설정</div>
+  <div class="site-badge">[9사(지리)07-02]</div>
+  <div style="margin-left:auto;display:flex;gap:8px;">
+    <button class="hbtn" style="background:var(--t3);color:white;" onclick="saveAll()">💾 HTML 저장</button>
+    <button class="hbtn" style="background:var(--t1);color:white;" onclick="savePDF()">📄 PDF 저장</button>
+  </div>
+</div>
+
+<!-- 탭 네비 -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab(0)" id="tab0">
+    <div class="tab-step" id="ts0" style="background:var(--t1);">1</div>
+    📊 장소감 측정
+  </button>
+  <button class="tab-btn" onclick="switchTab(1)" id="tab1">
+    <div class="tab-step" id="ts1">2</div>
+    ✨ 나의 장소 이야기
+  </button>
+  <button class="tab-btn" onclick="switchTab(2)" id="tab2">
+    <div class="tab-step" id="ts2">3</div>
+    👥 모둠 공유·성찰
+  </button>
+</div>
+
+<!-- ══════════ 탭1 ══════════ -->
+<div class="tab-panel active" id="panel0">
+<div class="wrap">
+
+  <div class="t1-intro">
+    <div class="t1-intro-title" id="t1-title">🏫 학교 장소감 측정하기</div>
+    <div class="t1-intro-sub">
+      장소감은 장소에 대한 경험과 의식을 통해 생겨납니다.<br>
+      같은 학교에 다니는 우리, 학교에 대해 같은 장소감을 갖고 있을까요?
+    </div>
+    <div class="t1-example">
+      💡 예시 — 서울 탑골공원에 대한 인식은 노년층과 청년층 간에 확연한 차이가 있습니다.<br>
+      우리 학교는 어떨까요? 지금부터 직접 측정해봅시다.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr" style="background:var(--t1);color:white;">
+      <span>① 장소감 측정 — 해당하는 칸에 ✓ 표시하세요</span>
+    </div>
+    <div class="card-body" style="overflow-x:auto;">
+      <table class="scale-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding-left:14px;">문항</th>
+            <th class="topic-col">주제</th>
+            <th>전혀<br>아니다</th>
+            <th>아니다</th>
+            <th>그렇다</th>
+            <th>매우<br>그렇다</th>
+          </tr>
+        </thead>
+        <tbody id="scaleBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr" style="background:var(--gray-l);color:var(--ink);border-bottom:1.5px solid var(--border);">
+      <span>② 나의 장소감 정리</span>
+    </div>
+    <div class="card-body">
+      <div class="result-grid">
+        <div class="result-card">
+          <div class="result-label">가장 높은 점수 문항:</div>
+          <div class="write-box" contenteditable="true" style="min-height:32px;" data-placeholder="어떤 문항이 가장 높았나요?"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">가장 낮은 점수 문항:</div>
+          <div class="write-box" contenteditable="true" style="min-height:32px;" data-placeholder="어떤 문항이 가장 낮았나요?"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">내가 직접 쓴 형용사와 이유:</div>
+          <div class="write-box" contenteditable="true" style="min-height:32px;" data-placeholder="어떤 형용사를 골랐나요? 왜요?"></div>
+        </div>
+        <div class="result-card">
+          <div class="result-label" id="school-q">이 학교는 나에게 어떤 곳인가요?</div>
+          <div class="write-box" contenteditable="true" style="min-height:32px;" data-placeholder="한 문장으로 정리해보세요"></div>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="field-label" style="color:var(--t1);">모둠원과 비교하고 싶은 문항은? 왜 궁금한가요?</div>
+        <div class="write-box" contenteditable="true" style="min-height:36px;"
+          data-placeholder="예: '내 학교라는 느낌' 문항이 궁금해요. 친구들도 나처럼 느낄지 모르겠어서…"></div>
+      </div>
+    </div>
+  </div>
+
+  <button class="next-btn" style="background:var(--t2);" onclick="switchTab(1)">
+    ✨ 나의 장소 이야기로 →
+  </button>
+</div>
+</div>
+
+<!-- ══════════ 탭2 ══════════ -->
+<div class="tab-panel" id="panel1">
+<div class="wrap">
+
+  <div class="routine-intro">
+    <div class="routine-intro-title">✨ 나만의 장소 이야기</div>
+    <div style="font-size:12px;color:var(--gray);line-height:1.6;">
+      학교 말고, <strong style="color:var(--t2);">내가 자주 가거나 의미 있는 장소 1곳</strong>을 골라보세요.<br>
+      장소감의 층위를 3단계로 탐구하고, 지도에 위치를 표시합니다.
+    </div>
+    <div class="routine-steps">
+      <div class="routine-step" style="border-color:#C4B5FD;">
+        <span class="rs-num" style="color:var(--t1);">🎯 중심</span>
+        표면에 보이는 것 — 내가 이 장소에서 주로 하는 것
+      </div>
+      <div class="routine-step" style="border-color:#F9A8D4;">
+        <span class="rs-num" style="color:var(--t2);">🔄 주변</span>
+        그 주변에 있는 것 — 감정·기억·경험
+      </div>
+      <div class="routine-step" style="border-color:#FDE68A;">
+        <span class="rs-num" style="color:var(--amber);">✨ 숨겨진 이야기</span>
+        깊이 들어가면 — 이 장소의 진짜 의미
+      </div>
+    </div>
+  </div>
+
+  <!-- 장소 선택 -->
+  <div class="card">
+    <div class="card-hdr" style="background:var(--gray-l);color:var(--ink);border-bottom:1.5px solid var(--border);">
+      🗺️ 탐구할 장소 선택
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <div class="field-label" style="color:var(--gray);">내가 선택한 장소:</div>
+          <div class="write-box" contenteditable="true" style="min-height:28px;"
+            data-placeholder="예: 청계산 입구 편의점 / 학교 뒤 공터 / 단골 분식집…"></div>
+        </div>
+        <div>
+          <div class="field-label" style="color:var(--gray);">이 장소를 선택한 이유:</div>
+          <div class="write-box" contenteditable="true" style="min-height:28px;"
+            data-placeholder="왜 이 장소가 가장 먼저 떠올랐나요?"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 중심 -->
+  <div class="r-card" style="border-color:#C4B5FD;">
+    <div class="r-card-hdr" style="background:#8B6FD4;">
+      <div class="r-card-num">🎯</div>
+      <div>
+        <div class="r-card-title" style="color:white;">중심 (Core)</div>
+        <div class="r-card-sub" style="color:#E0D9F8;">표면에서 보이는 것 — 이 장소에서 내가 주로 하는 것</div>
+      </div>
+      <div style="margin-left:auto;font-size:9px;color:rgba(255,255,255,.7);background:rgba(255,255,255,.15);padding:2px 8px;border-radius:3px;">STEP 1</div>
+    </div>
+    <div class="r-card-body" style="background:#F5F2FF;">
+      <div class="prompt-item">
+        <span class="prompt-q" style="color:#8B6FD4;">Q.</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--ink);padding-top:2px;">이 장소에서 나는 주로 무엇을 하나요?</span>
+      </div>
+      <div class="prompt-item">
+        <span class="prompt-q" style="color:#8B6FD4;visibility:hidden;">Q.</span>
+        <div class="prompt-a" contenteditable="true" style="border-color:#C4B5FD;"
+          data-placeholder="예: 친구들과 떡볶이를 먹는다 / 혼자 걸으면서 음악을 듣는다…"></div>
+      </div>
+      <div class="prompt-item" style="margin-top:8px;">
+        <span class="prompt-q" style="color:#8B6FD4;">Q.</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--ink);padding-top:2px;">얼마나 자주, 어떤 상황에서 이 장소에 오나요?</span>
+      </div>
+      <div class="prompt-item">
+        <span class="prompt-q" style="color:#8B6FD4;visibility:hidden;">Q.</span>
+        <div class="prompt-a" contenteditable="true" style="border-color:#C4B5FD;"
+          data-placeholder="예: 시험 전날마다 / 기분이 안 좋을 때 / 매일 하교할 때…"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 주변 -->
+  <div class="r-card" style="border-color:#F9A8D4;">
+    <div class="r-card-hdr" style="background:#D4849A;">
+      <div class="r-card-num">🔄</div>
+      <div>
+        <div class="r-card-title" style="color:white;">주변 (Periphery)</div>
+        <div class="r-card-sub" style="color:#FCE7F3;">그 주변에 있는 것 — 감정·기억·경험</div>
+      </div>
+      <div style="margin-left:auto;font-size:9px;color:rgba(255,255,255,.7);background:rgba(255,255,255,.15);padding:2px 8px;border-radius:3px;">STEP 2</div>
+    </div>
+    <div class="r-card-body" style="background:#FDF2F7;">
+      <div class="prompt-item">
+        <span class="prompt-q" style="color:#D4849A;">Q.</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--ink);padding-top:2px;">이 장소에 있을 때 어떤 감정이 드나요?</span>
+      </div>
+      <div class="prompt-item">
+        <span class="prompt-q" style="color:#D4849A;visibility:hidden;">Q.</span>
+        <div class="emotion-row">
+          <span class="e-label">감정 선택 (클릭):</span>
+          <button class="e-btn" onclick="this.classList.toggle('sel')">😌</button>
+          <button class="e-btn" onclick="this.classList.toggle('sel')">😊</button>
+          <button class="e-btn" onclick="this.classList.toggle('sel')">🤩</button>
+          <button class="e-btn" onclick="this.classList.toggle('sel')">😔</button>
+          <button class="e-btn" onclick="this.classList.toggle('sel')">😤</button>
+          <button class="e-btn" onclick="this.classList.toggle('sel')">😰</button>
+          <button class="e-btn" onclick="this.classList.toggle('sel')">🥲</button>
+          <button class="e-btn" onclick="this.classList.toggle('sel')">😶</button>
+        </div>
+      </div>
+      <div class="prompt-item" style="margin-top:8px;">
+        <span class="prompt-q" style="color:#D4849A;">Q.</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--ink);padding-top:2px;">이 장소와 관련된 가장 기억에 남는 순간은?</span>
+      </div>
+      <div class="prompt-item">
+        <span class="prompt-q" style="color:#D4849A;visibility:hidden;">Q.</span>
+        <div class="big-write" contenteditable="true" style="border-color:#F9A8D4;"
+          data-placeholder="예: 중간고사 전날 여기서 친구랑 공부했는데, 처음으로 수학을 이해한 것 같았다…"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 숨겨진 이야기 -->
+  <div class="r-card" style="border-color:#FDE68A;">
+    <div class="r-card-hdr" style="background:#D4A76A;">
+      <div class="r-card-num">✨</div>
+      <div>
+        <div class="r-card-title" style="color:white;">숨겨진 이야기 (Hidden Story)</div>
+        <div class="r-card-sub" style="color:#FEF3C7;">깊이 들어가면 보이는 것 — 이 장소의 진짜 의미</div>
+      </div>
+      <div style="margin-left:auto;font-size:9px;color:rgba(255,255,255,.7);background:rgba(255,255,255,.15);padding:2px 8px;border-radius:3px;">STEP 3</div>
+    </div>
+    <div class="r-card-body" style="background:#FFFBF0;">
+      <div class="prompt-item">
+        <span class="prompt-q" style="color:#D4A76A;">Q.</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--ink);padding-top:2px;">이 장소가 사라진다면 어떤 감정이 들 것 같나요? 왜요?</span>
+      </div>
+      <div class="prompt-item">
+        <span class="prompt-q" style="color:#D4A76A;visibility:hidden;">Q.</span>
+        <div class="big-write" contenteditable="true" style="border-color:#FDE68A;min-height:60px;"
+          data-placeholder="예: 굉장히 슬플 것 같다. 이곳이 없으면 내가 쉬고 충전할 공간이 없어지기 때문에…"></div>
+      </div>
+      <div class="prompt-item" style="margin-top:8px;">
+        <span class="prompt-q" style="color:#D4A76A;">Q.</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--ink);padding-top:2px;">이 장소는 나에게 한 마디로 어떤 곳인가요?</span>
+      </div>
+      <div class="prompt-item">
+        <span class="prompt-q" style="color:#D4A76A;visibility:hidden;">Q.</span>
+        <div class="prompt-a" contenteditable="true" style="border-color:#FDE68A;font-size:13px;font-weight:700;"
+          data-placeholder="나에게 이 장소는 '____________' 같은 곳이다."></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 지도 핀 찍기 -->
+  <div class="map-section">
+    <div class="map-hdr">
+      🗺️ 지도에 내 장소 표시하기
+      <span style="margin-left:auto;font-size:10px;opacity:.8;">학교 중심으로 내 장소를 지도에 직접 핀으로 표시해보세요</span>
+    </div>
+    <div class="map-body">
+      <div id="placeMap"></div>
+      <div class="map-ctrl">
+        <div class="map-ctrl-label">📍 장소 추가 방법</div>
+        <div class="map-ctrl-hint">
+          ① 아래 버튼 클릭<br>
+          ② 지도에서 내 장소 위치 클릭<br>
+          ③ 장소 이름 입력
+        </div>
+        <button class="map-add-btn" id="addBtn" onclick="toggleAddMode()">
+          📍 장소 핀 찍기
+        </button>
+        <div id="mapHint" style="font-size:10px;color:var(--t3);display:none;text-align:center;">
+          ✅ 지도를 클릭하세요!
+        </div>
+        <div class="map-ctrl-label" style="margin-top:4px;">추가된 장소</div>
+        <div class="marker-list" id="markerList">
+          <div style="font-size:10px;color:var(--gray);text-align:center;padding:8px;">
+            아직 없어요
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="next-btn" style="background:var(--t3);" onclick="switchTab(2)">
+    👥 모둠 공유·성찰로 →
+  </button>
+</div>
+</div>
+
+<!-- ══════════ 탭3 ══════════ -->
+<div class="tab-panel" id="panel2">
+<div class="wrap">
+
+  <!-- 모둠 공유 -->
+  <div class="card">
+    <div class="card-hdr" style="background:var(--t3);color:white;">
+      👥 모둠 공유 — 4명이 선택한 장소와 장소감을 비교해보세요
+    </div>
+    <div style="overflow-x:auto;">
+      <div class="share-grid" style="min-width:600px;">
+        <div class="share-col">
+          <div class="share-col-hdr" style="background:#8B6FD4;">
+            <div class="share-col-num">1</div>
+            <span style="font-size:10px;font-weight:800;color:white;">모둠원 1</span>
+          </div>
+          <div class="share-field"><div class="share-label" style="color:#8B6FD4;">선택한 장소</div><div class="share-write" contenteditable="true" data-placeholder="장소 이름"></div></div>
+          <div class="share-field"><div class="share-label" style="color:#8B6FD4;">중심 (주로 하는 것)</div><div class="share-write" contenteditable="true" data-placeholder=""></div></div>
+          <div class="share-field"><div class="share-label" style="color:#8B6FD4;">감정</div><div class="share-write" contenteditable="true" style="min-height:24px;" data-placeholder="😊😔…"></div></div>
+          <div class="share-field"><div class="share-label" style="color:#8B6FD4;">숨겨진 이야기</div><div class="share-write" contenteditable="true" style="min-height:40px;" data-placeholder="진짜 의미"></div></div>
+        </div>
+        <div class="share-col">
+          <div class="share-col-hdr" style="background:#6BAE97;">
+            <div class="share-col-num">2</div>
+            <span style="font-size:10px;font-weight:800;color:white;">모둠원 2</span>
+          </div>
+          <div class="share-field"><div class="share-label" style="color:#6BAE97;">선택한 장소</div><div class="share-write" contenteditable="true" data-placeholder="장소 이름"></div></div>
+          <div class="share-field"><div class="share-label" style="color:#6BAE97;">중심 (주로 하는 것)</div><div class="share-write" contenteditable="true" data-placeholder=""></div></div>
+          <div class="share-field"><div class="share-label" style="color:#6BAE97;">감정</div><div class="share-write" contenteditable="true" style="min-height:24px;" data-placeholder="😊😔…"></div></div>
+          <div class="share-field"><div class="share-label" style="color:#6BAE97;">숨겨진 이야기</div><div class="share-write" contenteditable="true" style="min-height:40px;" data-placeholder="진짜 의미"></div></div>
+        </div>
+        <div class="share-col">
+          <div class="share-col-hdr" style="background:#D4849A;">
+            <div class="share-col-num">3</div>
+            <span style="font-size:10px;font-weight:800;color:white;">모둠원 3</span>
+          </div>
+          <div class="share-field"><div class="share-label" style="color:#D4849A;">선택한 장소</div><div class="share-write" contenteditable="true" data-placeholder="장소 이름"></div></div>
+          <div class="share-field"><div class="share-label" style="color:#D4849A;">중심 (주로 하는 것)</div><div class="share-write" contenteditable="true" data-placeholder=""></div></div>
+          <div class="share-field"><div class="share-label" style="color:#D4849A;">감정</div><div class="share-write" contenteditable="true" style="min-height:24px;" data-placeholder="😊😔…"></div></div>
+          <div class="share-field"><div class="share-label" style="color:#D4849A;">숨겨진 이야기</div><div class="share-write" contenteditable="true" style="min-height:40px;" data-placeholder="진짜 의미"></div></div>
+        </div>
+        <div class="share-col">
+          <div class="share-col-hdr" style="background:#D4A76A;">
+            <div class="share-col-num">4</div>
+            <span style="font-size:10px;font-weight:800;color:white;">모둠원 4</span>
+          </div>
+          <div class="share-field"><div class="share-label" style="color:#D4A76A;">선택한 장소</div><div class="share-write" contenteditable="true" data-placeholder="장소 이름"></div></div>
+          <div class="share-field"><div class="share-label" style="color:#D4A76A;">중심 (주로 하는 것)</div><div class="share-write" contenteditable="true" data-placeholder=""></div></div>
+          <div class="share-field"><div class="share-label" style="color:#D4A76A;">감정</div><div class="share-write" contenteditable="true" style="min-height:24px;" data-placeholder="😊😔…"></div></div>
+          <div class="share-field"><div class="share-label" style="color:#D4A76A;">숨겨진 이야기</div><div class="share-write" contenteditable="true" style="min-height:40px;" data-placeholder="진짜 의미"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="sel-bar">
+      <span>💜 <strong>공감</strong> — 같은 동네인데 왜 선택한 장소가 다를까?</span>
+      <span>🗺️ <strong>장소감</strong> — 같은 장소도 사람마다 다르게 느낀다</span>
+    </div>
+  </div>
+
+  <!-- 발견 정리 -->
+  <div class="card">
+    <div class="card-hdr" style="background:var(--gray-l);color:var(--ink);border-bottom:1.5px solid var(--border);">
+      🔍 모둠 발견 정리
+    </div>
+    <div class="card-body">
+      <div class="discovery-grid">
+        <div>
+          <div class="field-label" style="color:var(--t3);">우리 모둠의 공통점:</div>
+          <div class="write-box" contenteditable="true" data-placeholder="선택한 장소·감정 중 공통으로 나온 것은?"></div>
+        </div>
+        <div>
+          <div class="field-label" style="color:var(--t2);">우리 모둠의 차이점:</div>
+          <div class="write-box" contenteditable="true" data-placeholder="서로 다르게 느끼는 점은? 왜 다를까?"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 학교 장소감 비교 -->
+  <div class="card">
+    <div class="card-hdr" style="background:var(--t1);color:white;" id="school-compare-hdr">
+      <span id="school-compare-title">📊 학교 장소감 — 모둠 비교</span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:11px;color:var(--gray);margin-bottom:10px;">탭1에서 측정한 결과를 모둠원끼리 비교해보세요.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div class="field-label" style="color:var(--t1);">점수 차이가 가장 큰 문항과 이유:</div>
+          <div class="write-box" contenteditable="true" data-placeholder="어떤 문항에서 의견 차이가 가장 컸나요?"></div>
+        </div>
+        <div>
+          <div class="field-label" style="color:var(--t1);">같은 학교인데 장소감이 다른 이유:</div>
+          <div class="write-box" contenteditable="true" data-placeholder="나이·경험·기억 중 어떤 것이 영향을 줄까요?"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 성찰 -->
+  <div class="reflect-box">
+    <div style="font-size:11px;font-weight:800;color:var(--t3);margin-bottom:10px;">💚 개인 성찰</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div>
+        <div class="field-label" style="color:var(--t3);">Q1. 장소감이 무엇인지 나의 언어로 정의한다면?</div>
+        <div class="write-box" contenteditable="true" style="min-height:52px;border-color:#A7D8C8;"
+          data-placeholder="교과서 말고 내 말로 정의해보세요…"></div>
+      </div>
+      <div>
+        <div class="field-label" style="color:var(--blue);">Q2. 학교 장소감 측정에서 발견한 것은?</div>
+        <div class="write-box" contenteditable="true" style="min-height:52px;border-color:#BFDBFE;"
+          data-placeholder="친구와 비교해서 놀랐던 점이 있나요?"></div>
+      </div>
+    </div>
+    <div class="field-label" style="color:var(--t1);">Q3. 장소감은 왜 사람마다 다를까요?</div>
+    <div class="write-box" contenteditable="true" style="min-height:40px;border-color:#C4B5FD;"
+      data-placeholder="나이·경험·기억·관심사… 어떤 것이 장소감을 만들까요?"></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ── 학교 이름 ──────────────────────────────
+let schoolName = '';
+
+function startActivity() {
+  const v = document.getElementById('schoolInput').value.trim();
+  if (!v) { alert('학교 이름을 입력해주세요!'); return; }
+  schoolName = v;
+  applySchoolName();
+  document.getElementById('setupOverlay').style.display = 'none';
+  if (!mapInit) setTimeout(initMap, 300);
+}
+
+function changeSchool() {
+  const n = prompt('학교 이름을 변경하세요:', schoolName);
+  if (n && n.trim()) { schoolName = n.trim(); applySchoolName(); }
+}
+
+function applySchoolName() {
+  document.getElementById('schoolTag').textContent = schoolName;
+  document.getElementById('t1-title').textContent = `🏫 ${schoolName} 장소감 측정하기`;
+  document.getElementById('school-q').textContent = `${schoolName}는 나에게 어떤 곳인가요?`;
+  document.getElementById('school-compare-title').textContent = `📊 ${schoolName} 장소감 — 모둠 비교`;
+  buildScaleTable();
+}
+
+// ── 척도 표 ───────────────────────────────
+const scaleItems = [
+  { theme:'소속감', text:'이 학교에 다니는 것이 내 학교라는 느낌이 든다' },
+  { theme:'편안함', text:'학교에 있으면 편안하다' },
+  { theme:'관계',   text:'학교에서 나를 알아봐 주는 사람이 있다' },
+  { theme:'공간',   text:'학교에 내가 좋아하는 장소가 있다' },
+  { theme:'애착',   text:'졸업하면 이 학교가 그리울 것 같다' },
+];
+
+function buildScaleTable() {
+  const tbody = document.getElementById('scaleBody');
+  tbody.innerHTML = '';
+
+  scaleItems.forEach((item, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${item.text}</strong></td>
+      <td style="text-align:center;"><span class="topic-pill">${item.theme}</span></td>
+      <td class="scale-radio"><input type="radio" name="q${i}" value="1"></td>
+      <td class="scale-radio"><input type="radio" name="q${i}" value="2"></td>
+      <td class="scale-radio"><input type="radio" name="q${i}" value="3"></td>
+      <td class="scale-radio"><input type="radio" name="q${i}" value="4"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // 자유 문항 1개
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="free">
+      ${schoolName}는&nbsp;
+      <input class="free-input" type="text" placeholder="형용사를 직접 써보세요" style="width:130px;">
+      &nbsp;곳이다.
+    </td>
+    <td style="text-align:center;"><span class="topic-pill" style="background:var(--amber);">자유</span></td>
+    <td class="scale-radio"><input type="radio" name="qf0" value="1"></td>
+    <td class="scale-radio"><input type="radio" name="qf0" value="2"></td>
+    <td class="scale-radio"><input type="radio" name="qf0" value="3"></td>
+    <td class="scale-radio"><input type="radio" name="qf0" value="4"></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+// ── 탭 전환 ──────────────────────────────
+const panels = document.querySelectorAll('.tab-panel');
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabColors = ['var(--t1)', 'var(--t2)', 'var(--t3)'];
+const stepIds = ['ts0','ts1','ts2'];
+
+function switchTab(idx) {
+  panels.forEach((p,i) => p.classList.toggle('active', i===idx));
+  tabBtns.forEach((t,i) => {
+    t.classList.toggle('active', i===idx);
+    t.style.borderBottomColor = i===idx ? tabColors[i] : 'transparent';
+    t.style.color = i===idx ? 'var(--ink)' : '#A09AB8';
+    const ts = document.getElementById(stepIds[i]);
+    if (ts) {
+      ts.style.background = i===idx ? tabColors[i] : 'var(--border)';
+      ts.style.color = i===idx ? 'white' : 'var(--gray)';
+    }
+  });
+  if (idx === 1) {
+    if (!mapInit) { setTimeout(initMap, 300); }
+    else { setTimeout(() => leafmap && leafmap.invalidateSize(), 150); }
+  }
+}
+
+// 초기 탭1 색상
+tabBtns[0].style.borderBottomColor = 'var(--t1)';
+tabBtns[0].style.color = 'var(--ink)';
+
+// ── Leaflet 지도 ─────────────────────────
+let mapInit = false, leafmap, placeMarkers = [], addMode = false;
+const markerColors = ['#8B6FD4','#D4849A','#6BAE97','#D4A76A','#7BA7D4'];
+let colorIdx = 0;
+
+function initMap() {
+  if (mapInit) return;
+  mapInit = true;
+
+  // 학교 위치 기본값 (학교명에 따라 실제 좌표 사용 가능)
+  const center = [37.455, 127.052];
+  leafmap = L.map('placeMap', { center, zoom: 15, zoomControl: true });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, subdomains: 'abcd',
+    attribution: '© OpenStreetMap © CARTO'
+  }).addTo(leafmap);
+
+  // 학교 마커
+  L.marker(center, {
+    icon: L.divIcon({
+      className:'',
+      html:`<div style="width:32px;height:32px;border-radius:50%;background:#8B6FD4;
+        display:flex;align-items:center;justify-content:center;font-size:16px;
+        border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);">🏫</div>`,
+      iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-16]
+    })
+  }).addTo(leafmap).bindTooltip(schoolName || '우리 학교', { permanent:true, direction:'right', offset:[16,0] });
+
+  // 클릭 이벤트
+  leafmap.on('click', e => {
+    if (!addMode) return;
+    const name = prompt('이 장소의 이름을 입력하세요:', '');
+    if (!name) return;
+    addPlaceMarker(e.latlng, name);
+    addMode = false;
+    document.getElementById('addBtn').classList.remove('active');
+    document.getElementById('addBtn').textContent = '📍 장소 핀 찍기';
+    document.getElementById('mapHint').style.display = 'none';
+    leafmap.getContainer().style.cursor = '';
+  });
+
+  // 스타일
+  const style = document.createElement('style');
+  style.textContent = `.leaflet-tooltip{font-family:'Nanum Gothic',sans-serif;font-size:9pt;font-weight:700;padding:2px 7px;}`;
+  document.head.appendChild(style);
+}
+
+function toggleAddMode() {
+  if (!mapInit) initMap();
+  addMode = !addMode;
+  const btn = document.getElementById('addBtn');
+  const hint = document.getElementById('mapHint');
+  if (addMode) {
+    btn.classList.add('active');
+    btn.textContent = '🎯 지도를 클릭하세요!';
+    hint.style.display = 'block';
+    leafmap.getContainer().style.cursor = 'crosshair';
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '📍 장소 핀 찍기';
+    hint.style.display = 'none';
+    leafmap.getContainer().style.cursor = '';
+  }
+}
+
+function addPlaceMarker(latlng, name) {
+  const color = markerColors[colorIdx % markerColors.length];
+  colorIdx++;
+  const icon = L.divIcon({
+    className:'',
+    html:`<div style="width:28px;height:28px;border-radius:50%;background:${color};
+      display:flex;align-items:center;justify-content:center;font-size:14px;
+      border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,.3);">📍</div>`,
+    iconSize:[28,28], iconAnchor:[14,14], popupAnchor:[0,-14]
+  });
+  const id = Date.now();
+  const m = L.marker(latlng, {icon}).addTo(leafmap);
+  m.bindPopup(`<b style="color:${color};">${name}</b>`);
+  m.bindTooltip(name, { permanent:true, direction:'right', offset:[14,0] });
+  placeMarkers.push({id, marker:m, name, color});
+  renderMarkerList();
+}
+
+function removeMarker(id) {
+  const idx = placeMarkers.findIndex(m => m.id===id);
+  if (idx >= 0) { leafmap.removeLayer(placeMarkers[idx].marker); placeMarkers.splice(idx,1); }
+  renderMarkerList();
+}
+
+function renderMarkerList() {
+  const list = document.getElementById('markerList');
+  if (!placeMarkers.length) {
+    list.innerHTML = '<div style="font-size:10px;color:var(--gray);text-align:center;padding:8px;">아직 없어요</div>';
+    return;
+  }
+  list.innerHTML = placeMarkers.map(m => `
+    <div class="marker-item">
+      <div class="marker-dot" style="background:${m.color};"></div>
+      <span style="font-size:10.5px;font-weight:700;">${m.name}</span>
+      <button class="marker-del" onclick="removeMarker(${m.id})">✕</button>
+    </div>
+  `).join('');
+}
+
+// ── 저장 ─────────────────────────────────
+function saveAll() {
+  const blob = new Blob([document.documentElement.outerHTML], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `07-02_장소감탐구_${schoolName||'우리학교'}.html`;
+  a.click();
+}
+
+function savePDF() {
+  // 모든 탭을 보이게 하고 인쇄
+  const style = document.createElement('style');
+  style.id = 'pdf-print-style';
+  style.textContent = `
+    @media print {
+      .site-header, .tab-nav { display:none !important; }
+      .tab-panel { display:block !important; page-break-before:always; }
+      .tab-panel:first-of-type { page-break-before:avoid; }
+      .tab-panel::before {
+        display:block;
+        font-family:'Nanum Gothic',sans-serif;
+        font-size:13px; font-weight:800;
+        padding:6px 0 10px; color:#8B6FD4;
+      }
+      #panel0::before { content:'[ 활동 1 — 장소감 측정 ]'; }
+      #panel1::before { content:'[ 활동 2 — 나의 장소 이야기 ]'; }
+      #panel2::before { content:'[ 활동 3 — 모둠 공유·성찰 ]'; }
+      body { background:white !important; }
+      .card, .r-card, .map-section, .t1-intro, .routine-intro, .reflect-box {
+        box-shadow:none !important;
+        break-inside:avoid;
+      }
+      #placeMap { height:200px !important; }
+      [contenteditable]:empty::before { display:none; }
+    }
+  `;
+  document.head.appendChild(style);
+  window.print();
+  setTimeout(() => {
+    const s = document.getElementById('pdf-print-style');
+    if (s) s.remove();
+  }, 2000);
+}
+</script>
+</body>
+</html>
